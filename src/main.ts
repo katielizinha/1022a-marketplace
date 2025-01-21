@@ -2,31 +2,33 @@ import express from 'express'
 import mysql from 'mysql2/promise'
 import cors from 'cors'
 import BancoMysql from './db/banco-mysql'
+import BancoMongo from './db/banco-mongo'
 
 const app = express()
 app.use(express.json())
 app.use(cors())
 
-app.get("/produtos", async(req,res)=>{
-    //OK -> 0 - Criar o banco de dados e iniciar o servidor de banco.
-    //1 - Criar a conexão com o banco
-    try{
-        const banco = new BancoMysql()
+//LISTAR
+app.get("/produtos", async (req, res) => {
+    try {
+        const banco = new BancoMongo()
         await banco.criarConexao()
-        const result = await banco.consultar("SELECT * from produtos")
+        const result = await banco.listar()
         await banco.finalizarConexao()
         res.send(result)
-    }catch(e){
+    } catch (e) {
+        console.log(e)
         res.status(500).send("Server ERROR")
     }
 })
-
+//iNSERIR
 app.post("/produtos", async (req, res) => {
     try {
-        const banco = new BancoMysql()
+        const {id,nome,descricao,preco,imagem} = req.body
+        const banco = new BancoMongo()
         await banco.criarConexao()
-        const result = await banco.consultar("INSERT INTO produtos VALUES (?,?,?,?,?)",
-            [id,nome,descricao,preco,imagem])
+        const produto = {id,nome,descricao,preco,imagem}
+        const result = await banco.inserir(produto)
         await banco.finalizarConexao()
         res.send(result)
     } catch (e) {
@@ -35,28 +37,32 @@ app.post("/produtos", async (req, res) => {
     }
 })
 
-
-app.get("/usuarios", async(req,res)=>{
-    //OK -> 0 - Criar o banco de dados e iniciar o servidor de banco.
-    //1 - Criar a conexão com o banco
+//DELETAR
+app.delete("/produtos/:id",async(req,res)=>{
     try{
-        const conection = await mysql.createConnection({
-            host:process.env.dbhost?process.env.dbhost:"localhost",
-            user:process.env.dbuser?process.env.dbuser:"root",
-            password:process.env.dbpassword?process.env.dbpassword:"",
-            database:process.env.dbname?process.env.dbname:"banco1022a",
-            port:process.env.dbport?parseInt(process.env.dbport):3306
-        })
-        //2 - Realizar uma consulta na tabela
-        const [result, fields] = await conection.query("SELECT * from usuarios")
-        await conection.end()
-        //3 - Devolver os dados pra quem pediu
-        res.send(result)
-    }catch(e){
-        res.status(500).send("Server ERROR")
+        const banco = new BancoMongo()
+        await banco.criarConexao()
+        const result = await banco.excluir(req.params.id)
+        await banco.finalizarConexao()
+        res.send("Produto excluido com sucesso id: "+req.params.id)
     }
+   catch(e){
+    console.log(e)
+    res.status(500).send("Erro ao excluir")
+   }
 })
 
-app.listen(8000,()=>{
+//ALTERAR
+app.put("/produtos/:id",async(req,res)=>{
+    const {id,nome,descricao,preco,imagem} = req.body
+    const produto = {nome,descricao,preco,imagem}
+    const banco = new BancoMongo()
+    await banco.criarConexao()
+    const result = await banco.alterar(req.params.id, produto)
+    await banco.finalizarConexao()
+    res.status(200).send("Produto alterado com sucesso id: "+req.params.id)
+})
+
+app.listen(8000, () => {
     console.log("Iniciei o servidor")
 })
